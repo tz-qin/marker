@@ -126,8 +126,9 @@ def convert_single_pdf(
     indent_blocks(pages)
 
     # Fix table blocks
-    table_count = format_tables(pages, doc, fname, detection_model, table_rec_model, ocr_model)
+    table_count, table_cell_info = format_tables(pages, doc, fname, detection_model, table_rec_model, ocr_model)
     out_meta["block_stats"]["table"] = table_count
+    out_meta["table_cells"] = table_cell_info   
 
     for page in pages:
         for block in page.blocks:
@@ -169,4 +170,24 @@ def convert_single_pdf(
 
     doc_images = images_to_dict(pages)
 
+    # Get block information
+    blocks_info = extract_block_info(pages)
+    out_meta["blocks"] = blocks_info
+
     return full_text, doc_images, out_meta
+
+
+def extract_block_info(pages):
+    blocks_info = []
+    for page_num, page in enumerate(pages):
+        for block in page.blocks:
+            block_info = {
+                "id": block.id,
+                "bbox": block.bbox,
+                "page": page_num,
+                "type": block.block_type,
+                "text": block.prelim_text,
+                "heading_level": block.heading_level
+            }
+            blocks_info.append(block_info)
+    return blocks_info

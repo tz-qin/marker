@@ -109,6 +109,8 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
     table_md = [formatter("markdown", cell)[0] for cell in cells]
 
     table_count = 0
+    table_cell_info = []  # Store cell info for each table
+
     for page_idx, page in enumerate(pages):
         page_table_count = table_counts[page_idx]
         if page_table_count == 0:
@@ -141,6 +143,26 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
                 table_count += 1
                 continue
 
+            # Get cell information for this table
+            table_cells = cells[table_count]
+            cell_info = []
+            
+            for cell in table_cells:
+                # Convert cell bbox to page coordinates
+                cell_bbox = rescale_bbox([0, 0, highres_size[0], highres_size[1]], page.bbox, cell.bbox)
+                cell_info.append({
+                    "text": cell.text,
+                    "bbox": cell_bbox,
+                    "row": cell.row_ids[0],
+                    "col": cell.col_ids[0],
+                })
+            
+            table_cell_info.append({
+                "page": page_idx,
+                "table_bbox": table_box,
+                "cells": cell_info
+            })
+            
             markdown = table_md[table_count]
             table_block = Block(
                 bbox=table_box,
@@ -164,4 +186,4 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
             new_page_blocks.insert(insert_point, table_block)
             table_count += 1
         page.blocks = new_page_blocks
-    return table_count
+    return table_count, table_cell_info
