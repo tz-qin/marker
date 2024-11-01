@@ -20,6 +20,7 @@ class MergedBlock(BboxElement):
     pnum: int
     block_type: Optional[str]
     heading_level: Optional[int] = None
+    id: Optional[int] = None
 
 
 class FullyMergedBlock(BaseModel):
@@ -27,3 +28,4 @@ class FullyMergedBlock(BaseModel):
     block_type: str
     page_start: bool
     pnum: int | None
+    block_id: Optional[int] = None

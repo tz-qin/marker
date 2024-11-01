@@ -56,6 +56,11 @@ def merge_spans(pages: List[Page]) -> List[List[MergedBlock]]:
                         elif span.bold and (not next_span or not next_span.bold):
                             span_text = surround_text(span_text, "**")
                     line_text += span_text
+
+                # For the last line in the block, add the ID
+                if linenum == len(block.lines) - 1 and block.id is not None and block.block_type not in ["Code", "Formula"]:
+                    line_text += f"[[{block.id}]]"
+
                 block_lines.append(MergedLine(
                     text=line_text,
                     fonts=fonts,
@@ -67,7 +72,8 @@ def merge_spans(pages: List[Page]) -> List[List[MergedBlock]]:
                     pnum=page.pnum,
                     bbox=block.bbox,
                     block_type=block.block_type,
-                    heading_level=block.heading_level
+                    heading_level=block.heading_level,
+                    id=block.id
                 ))
         if len(page_blocks) == 0:
             page_blocks.append(MergedBlock(
@@ -75,14 +81,15 @@ def merge_spans(pages: List[Page]) -> List[List[MergedBlock]]:
                 pnum=page.pnum,
                 bbox=page.bbox,
                 block_type="Text",
-                heading_level=None
+                heading_level=None,
+                id=None
             ))
         merged_blocks.append(page_blocks)
 
     return merged_blocks
 
 
-def block_surround(text, block_type, heading_level):
+def block_surround(text, block_type, heading_level, block_id=None):  # Add block_id parameter
     if block_type == "Section-header":
         if not text.startswith("#"):
             asterisks = "#" * heading_level if heading_level is not None else "##"
@@ -158,6 +165,7 @@ def merge_lines(blocks: List[List[MergedBlock]], max_block_gap=15):
     block_type = ""
     prev_heading_level = None
     pnum = None
+    curr_block_id = None  # Add this line
 
     for idx, page in enumerate(blocks):
         # Insert pagination at every page boundary
@@ -165,10 +173,11 @@ def merge_lines(blocks: List[List[MergedBlock]], max_block_gap=15):
             if block_text:
                 text_blocks.append(
                     FullyMergedBlock(
-                        text=block_surround(block_text, prev_type, prev_heading_level),
+                        text=block_surround(block_text, prev_type, prev_heading_level, curr_block_id),
                         block_type=prev_type if prev_type else settings.DEFAULT_BLOCK_TYPE,
                         page_start=False,
-                        pnum=pnum
+                        pnum=pnum,
+                        block_id=curr_block_id  # Add this line
                     )
                 )
                 block_text = ""
@@ -183,13 +192,15 @@ def merge_lines(blocks: List[List[MergedBlock]], max_block_gap=15):
 
         for block in page:
             block_type = block.block_type
+            curr_block_id = block.id
             if (block_type != prev_type and prev_type) or (block.heading_level != prev_heading_level and prev_heading_level):
                 text_blocks.append(
                     FullyMergedBlock(
-                        text=block_surround(block_text, prev_type, prev_heading_level),
+                        text=block_surround(block_text, prev_type, prev_heading_level, curr_block_id),
                         block_type=prev_type if prev_type else settings.DEFAULT_BLOCK_TYPE,
                         page_start=False,
-                        pnum=block.pnum
+                        pnum=block.pnum,
+                        block_id=curr_block_id  # Add this line
                     )
                 )
                 block_text = ""
@@ -213,10 +224,11 @@ def merge_lines(blocks: List[List[MergedBlock]], max_block_gap=15):
     # Append the final block
     text_blocks.append(
         FullyMergedBlock(
-            text=block_surround(block_text, prev_type, prev_heading_level),
+            text=block_surround(block_text, prev_type, prev_heading_level, curr_block_id),
             block_type=block_type if block_type else settings.DEFAULT_BLOCK_TYPE,
             page_start=False,
-            pnum=pnum
+            pnum=pnum,
+            block_id=curr_block_id  # Add this line
         )
     )
 

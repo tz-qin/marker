@@ -2,6 +2,7 @@ import math
 from typing import List, Optional
 
 from pydantic import field_validator
+from pydantic import BaseModel, model_validator
 import ftfy
 
 from marker.schema.bbox import BboxElement
@@ -40,12 +41,38 @@ class Line(BboxElement):
     def start(self):
         return self.spans[0].bbox[0]
 
+class BlockIDGenerator:
+    _instance = None
+    
+    def __init__(self):
+        self.current_id = 0
+        
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = BlockIDGenerator()
+        return cls._instance
+        
+    def get_next_id(self):
+        self.current_id += 1
+        return self.current_id
+        
+    def reset(self):
+        self.current_id = 0
 
 class Block(BboxElement):
     lines: List[Line]
     pnum: int
     block_type: Optional[str] = None
     heading_level: Optional[int] = None
+    id: Optional[int] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def generate_id(cls, data):
+        if isinstance(data, dict):
+            data['id'] = BlockIDGenerator.get_instance().get_next_id()
+        return data
 
     @property
     def prelim_text(self):
@@ -97,8 +124,20 @@ def split_block_lines(block: Block, split_line_idx: int):
     elif split_line_idx == 0:
         return [block]
     else:
-        new_blocks.append(Block(lines=block.lines[:split_line_idx], bbox=bbox_from_lines(block.lines[:split_line_idx]), pnum=block.pnum))
-        new_blocks.append(Block(lines=block.lines[split_line_idx:], bbox=bbox_from_lines(block.lines[split_line_idx:]), pnum=block.pnum))
+        new_blocks.append(Block(
+            lines=block.lines[:split_line_idx], 
+            bbox=bbox_from_lines(block.lines[:split_line_idx]), 
+            pnum=block.pnum,
+            block_type=block.block_type,
+            heading_level=block.heading_level
+        ))
+        new_blocks.append(Block(
+            lines=block.lines[split_line_idx:], 
+            bbox=bbox_from_lines(block.lines[split_line_idx:]), 
+            pnum=block.pnum,
+            block_type=block.block_type,
+            heading_level=block.heading_level
+        ))
     return new_blocks
 
 
