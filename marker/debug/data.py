@@ -31,12 +31,19 @@ def draw_layout_page_debug_images(fname, pages: List[Page]):
         pdf_image = png_image.copy()
 
         line_bboxes = [line.bbox for line in page.text_lines.bboxes]
+        line_bboxes = [rescale_bbox(page.text_lines.image_bbox, page.bbox, b, width_adjust=0.255, height_adjust=-0.031) for b in line_bboxes]
+        
         render_on_image(line_bboxes, png_image, color="blue")
 
         layout_boxes = [rescale_bbox(page.layout.image_bbox, page.text_lines.image_bbox, box.bbox) for box in page.layout.bboxes]
         layout_labels = [box.label for box in page.layout.bboxes]
 
         render_on_image(layout_boxes, png_image, labels=layout_labels, color="red")
+ 
+        # print(f"\nPage {idx} dimensions:")
+        # print(f"text_lines.image_bbox: {page.text_lines.image_bbox}")
+        # print(f"layout.image_bbox: {page.layout.image_bbox}")
+        # print(f"page.bbox: {page.bbox}")
 
         order_labels = [str(i) for i in range(len(page.layout.bboxes))]
         render_on_image(layout_boxes, png_image, labels=order_labels, color="green", draw_bbox=False, label_offset=5)

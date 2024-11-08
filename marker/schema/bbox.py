@@ -103,11 +103,11 @@ class BboxElement(BaseModel):
         return ((bbox_center[0] - other_center[0]) ** 2 + (bbox_center[1] - other_center[1]) ** 2) ** 0.5
 
 
-def rescale_bbox(orig_dim, new_dim, bbox):
+def rescale_bbox(orig_dim, new_dim, bbox, width_adjust = 0, height_adjust = 0):
     page_width, page_height = new_dim[2] - new_dim[0], new_dim[3] - new_dim[1]
     detected_width, detected_height = orig_dim[2] - orig_dim[0], orig_dim[3] - orig_dim[1]
-    width_scaler = detected_width / page_width
-    height_scaler = detected_height / page_height
+    width_scaler = detected_width / page_width + width_adjust
+    height_scaler = detected_height / page_height + height_adjust
 
     new_bbox = [bbox[0] / width_scaler, bbox[1] / height_scaler, bbox[2] / width_scaler, bbox[3] / height_scaler]
     return new_bbox
