@@ -30,8 +30,36 @@ class Span(BboxElement):
         return ftfy.fix_text(text)
 
 
+class LineIDGenerator:
+    _instance = None
+    
+    def __init__(self):
+        self.current_id = 0
+        
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = LineIDGenerator()
+        return cls._instance
+        
+    def get_next_id(self):
+        self.current_id += 1
+        return self.current_id
+        
+    def reset(self):
+        self.current_id = 0
+
+
 class Line(BboxElement):
     spans: List[Span]
+    id: Optional[int] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def generate_id(cls, data):
+        if isinstance(data, dict):
+            data['id'] = LineIDGenerator.get_instance().get_next_id()
+        return data
 
     @property
     def prelim_text(self):

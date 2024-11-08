@@ -105,7 +105,16 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
 
     # This will redo OCR if OCR is forced, since we need to redetect bounding boxes, etc.
     table_rec = recognize_tables(table_imgs, cells, needs_ocr, rec_models, table_rec_batch_size=get_batch_size(), ocr_batch_size=get_ocr_batch_size())
-    cells = [assign_rows_columns(tr, im_size) for tr, im_size in zip(table_rec, img_sizes)]
+    # cells = [assign_rows_columns(tr, im_size) for tr, im_size in zip(table_rec, img_sizes)]
+    cells = []
+ 
+    for table_num, tr, im_size in zip(range(len(table_rec)), table_rec, img_sizes):
+        cell = assign_rows_columns(tr, im_size)
+        for single_cell in cell:
+            single_cell.text += f"[[t{table_num}_{single_cell.row_ids[0]}_{single_cell.col_ids[0]}]]"
+
+        cells.append(cell)
+
     table_md = [formatter("markdown", cell)[0] for cell in cells]
 
     table_count = 0
@@ -159,6 +168,7 @@ def format_tables(pages: List[Page], doc: PdfDocument, fname: str, detection_mod
             
             table_cell_info.append({
                 "page": page_idx,
+                "table_id": table_count,
                 "table_bbox": table_box,
                 "cells": cell_info
             })

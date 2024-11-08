@@ -26,12 +26,15 @@ def surround_text(s, char_to_insert):
 
 def merge_spans(pages: List[Page]) -> List[List[MergedBlock]]:
     merged_blocks = []
-    for page in pages:
+    for pagenum, page in enumerate(pages):
+        page_num = pagenum + 1
         page_blocks = []
         for blocknum, block in enumerate(page.blocks):
             block_lines = []
+            block_id = block.id
             for linenum, line in enumerate(block.lines):
                 line_text = ""
+                line_id = line.id
                 if len(line.spans) == 0:
                     continue
                 fonts = []
@@ -56,10 +59,11 @@ def merge_spans(pages: List[Page]) -> List[List[MergedBlock]]:
                         elif span.bold and (not next_span or not next_span.bold):
                             span_text = surround_text(span_text, "**")
                     line_text += span_text
+                line_text += f" [[{page_num}_{block_id}_{line_id}]]"
 
                 # For the last line in the block, add the ID
-                if linenum == len(block.lines) - 1 and block.id is not None and block.block_type not in ["Code", "Formula"]:
-                    line_text += f"[[{block.id}]]"
+                # if linenum == len(block.lines) - 1 and block.id is not None and block.block_type not in ["Code", "Formula"]:
+                #     line_text += f"[[{block.id}]]"
 
                 block_lines.append(MergedLine(
                     text=line_text,
