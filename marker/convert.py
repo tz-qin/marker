@@ -36,6 +36,8 @@ from marker.cleaners.toc import compute_toc
 from typing import List, Dict, Tuple, Optional
 from marker.settings import settings
 
+from marker.textract.parser import parse_textract_json
+
 
 def convert_single_pdf(
         fname: str,
@@ -190,3 +192,61 @@ def extract_block_info(pages):
             }
             blocks_info.append(block_info)
     return blocks_info
+
+
+def convert_single_textract(
+    fname: str,
+    textract_json: Dict,
+    max_pages: int = None,
+    metadata: Optional[Dict] = None,
+    langs: Optional[List[str]] = None,
+    batch_multiplier: int = 1
+) -> Tuple[str, Dict[str, Image.Image], Dict]:
+    """Convert Textract JSON output to markdown"""
+
+    # Get page dimensions from PDF
+    doc = pdfium.PdfDocument(fname)
+    first_page = doc[0]
+    width = first_page.get_width()
+    height = first_page.get_height()
+    
+    # Parse Textract JSON into Pages objects
+    pages = parse_textract_json(textract_json, width, height)
+    
+    if max_pages:
+        pages = pages[:max_pages]
+        
+    # Setup output metadata
+    out_meta = {
+        "languages": langs,
+        "filetype": "textract",
+        "pages": len(pages),
+        "ocr_stats": {
+            "ocr_pages": len(pages),
+            "ocr_failed": 0,
+            "ocr_success": len(pages),
+            "ocr_engine": "textract"
+        }
+    }
+
+    # Split headers
+    # split_heading_blocks(pages)
+    # infer_heading_levels(pages)
+    # find_bold_italic(pages)
+    
+    # Compute TOC
+    # out_meta["computed_toc"] = compute_toc(pages)
+
+    # Merge and clean text
+    merged_lines = merge_spans(pages)
+    text_blocks = merge_lines(merged_lines)
+    text_blocks = filter_common_titles(text_blocks)
+    full_text = get_full_text(text_blocks)
+    full_text = cleanup_text(full_text)
+
+    # Get block information
+    blocks_info = extract_block_info(pages)
+    out_meta["blocks"] = blocks_info
+
+
+    return full_text, {}, out_meta
