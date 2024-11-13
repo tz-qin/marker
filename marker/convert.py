@@ -229,6 +229,10 @@ def convert_single_textract(
         }
     }
 
+    # # Sort from reading order
+    # textract_find_order(pages)
+    # sort_blocks_in_reading_order(pages)
+
     # Split headers
     # split_heading_blocks(pages)
     # infer_heading_levels(pages)

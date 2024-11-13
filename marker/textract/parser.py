@@ -5,6 +5,8 @@ from marker.schema.page import Page
 from tabled.formats.markdown import markdown_format
 from tabled.schema import SpanTableCell
 
+from surya.schema import TextDetectionResult, LayoutResult, OrderResult, LayoutBox
+
 def convert_bbox(textract_bbox: Dict[str, float], page_width: int, page_height: int) -> List[float]:
     """
     Convert Textract BoundingBox format (normalized 0-1) to absolute pixel coordinates
@@ -176,6 +178,38 @@ def process_table(block: Dict, blocks_by_id: Dict[str, Dict], page_width: int, p
     
     return table_block
 
+def reorder_blocks_by_position(blocks: List[Block]) -> List[Block]:
+    """Reorder blocks based on their vertical position"""
+    
+    # Separate table and non-table blocks
+    table_blocks = [b for b in blocks if b.block_type == "Table"]
+    text_blocks = [b for b in blocks if b.block_type != "Table"]
+    
+    # Sort text blocks by vertical position
+    text_blocks.sort(key=lambda b: b.bbox[1])  # Sort by y-coordinate (top)
+    
+    # For each table block, find where it should be inserted
+    reordered_blocks = []
+    remaining_tables = table_blocks.copy()
+    
+    for i, text_block in enumerate(text_blocks):
+        # Add any tables that should come before this text block
+        while remaining_tables:
+            table = remaining_tables[0]
+            # If table's top is before current text block's top
+            if table.bbox[1] < text_block.bbox[1]:
+                reordered_blocks.append(table)
+                remaining_tables.pop(0)
+            else:
+                break
+                
+        reordered_blocks.append(text_block)
+    
+    # Add any remaining tables at the end
+    reordered_blocks.extend(remaining_tables)
+    
+    return reordered_blocks
+
 def parse_textract_json(json_data: Dict[str, Any], page_width: int = 1000, page_height: int = 1000) -> List[Page]:
     """Main function to convert Textract JSON to Pages objects"""
     
@@ -184,10 +218,39 @@ def parse_textract_json(json_data: Dict[str, Any], page_width: int = 1000, page_
     blocks_by_id: Dict[str, Dict] = {}  # Store blocks by ID for relationship lookup
     table_counter = 0
     
-    # First pass: Store all blocks by ID for relationship lookup
+    # First pass: Store all blocks by ID and initialize pages with layout
     for block in json_data["Blocks"]:
         blocks_by_id[block["Id"]] = block
         
+        if "LAYOUT" in block["BlockType"]:
+            # Get page number (Textract is 1-indexed)
+            page_num = block["Page"] - 1
+            
+            # Create page if it doesn't exist
+            if page_num not in pages:
+                pages[page_num] = Page(
+                    pnum=page_num,
+                    blocks=[],
+                    bbox=[0, 0, page_width, page_height],
+                    ocr_method="textract",
+                    layout=LayoutResult(
+                        bboxes=[],
+                        segmentation_map=None,
+                        image_bbox=[0, 0, page_width, page_height]
+                    )
+                )
+            
+            # Convert bbox and create LayoutBox
+            bbox = convert_bbox(block["Geometry"]["BoundingBox"], page_width, page_height)
+            layout_box = LayoutBox(
+                polygon=[[bbox[0], bbox[1]], [bbox[2], bbox[1]], 
+                        [bbox[2], bbox[3]], [bbox[0], bbox[3]]],
+                label=block["BlockType"].lower()
+            )
+            
+            # Add to page's layout bboxes
+            pages[page_num].layout.bboxes.append(layout_box)
+    
     # Process tables first and number their cells
     for block in json_data["Blocks"]:
         if block["BlockType"] == "TABLE":
@@ -238,5 +301,9 @@ def parse_textract_json(json_data: Dict[str, Any], page_width: int = 1000, page_
     
     # Convert dict to list and sort by page number
     pages_list = [pages[i] for i in sorted(pages.keys())]
+    
+    # Reorder blocks on each page
+    for page in pages_list:
+        page.blocks = reorder_blocks_by_position(page.blocks)
     
     return pages_list
